@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>二维码列表 - 扫码听语音</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: #f5f6fa;
+      color: #1a1a2e;
+      padding: 20px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-bottom: 8px;
+    }
+
+    .header p {
+      font-size: 14px;
+      color: #888;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+    }
+
+    .tool-btn {
+      padding: 10px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 500;
+    }
+
+    .tool-btn.print {
+      background: #667eea;
+      color: #fff;
+    }
+
+    .tool-btn.print:hover {
+      background: #5568d3;
+    }
+
+    .tool-btn.download {
+      background: #fff;
+      color: #667eea;
+      border: 2px solid #667eea;
+    }
+
+    .tool-btn.download:hover {
+      background: #f0f1ff;
+    }
+
+    .qr-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .qr-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      transition: transform 0.2s, box-shadow 0.2s;
+      cursor: pointer;
+    }
+
+    .qr-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    }
+
+    .qr-card canvas {
+      width: 160px !important;
+      height: 160px !important;
+      margin: 0 auto 10px;
+      display: block;
+    }
+
+    .qr-card .qr-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a1a2e;
+      line-height: 1.4;
+      word-break: break-all;
+    }
+
+    .qr-card .qr-id {
+      font-size: 12px;
+      color: #aaa;
+      margin-top: 4px;
+    }
+
+    /* 打印样式 */
+    @media print {
+      body {
+        background: #fff;
+        padding: 0;
+      }
+
+      .header {
+        margin-bottom: 20px;
+        page-break-after: avoid;
+      }
+
+      .header h1 {
+        font-size: 20px;
+      }
+
+      .toolbar {
+        display: none !important;
+      }
+
+      .qr-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        max-width: 100%;
+      }
+
+      .qr-card {
+        box-shadow: none;
+        border: 1px solid #ddd;
+        page-break-inside: avoid;
+        padding: 10px;
+      }
+
+      .qr-card canvas {
+        width: 120px !important;
+        height: 120px !important;
+      }
+
+      .qr-card .qr-title {
+        font-size: 12px;
+      }
+    }
+
+    /* 弹窗 */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #fff;
+      border-radius: 16px;
+      padding: 30px;
+      text-align: center;
+      max-width: 360px;
+      width: 90%;
+    }
+
+    .modal-content canvas {
+      width: 280px !important;
+      height: 280px !important;
+      margin: 0 auto 16px;
+      display: block;
+    }
+
+    .modal-content h3 {
+      font-size: 18px;
+      margin-bottom: 16px;
+    }
+
+    .modal-content .modal-btns {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .modal-content .modal-btns a,
+    .modal-content .modal-btns button {
+      padding: 8px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      text-decoration: none;
+      border: none;
+      font-weight: 500;
+    }
+
+    .modal-content .modal-btns .play-link {
+      background: #667eea;
+      color: #fff;
+    }
+
+    .modal-content .modal-btns .close-btn {
+      background: #f0f0f0;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>扫码听语音 - 二维码列表</h1>
+    <p>共 <span id="totalCount">0</span> 个音频，点击二维码可放大查看</p>
+  </div>
+
+  <div class="toolbar">
+    <button class="tool-btn print" onclick="window.print()">打印 / 保存PDF</button>
+    <button class="tool-btn download" onclick="downloadAll()">批量下载二维码</button>
+  </div>
+
+  <div class="qr-grid" id="qrGrid"></div>
+
+  <!-- 弹窗 -->
+  <div class="modal-overlay" id="modal" onclick="closeModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <canvas id="modalCanvas"></canvas>
+      <h3 id="modalTitle"></h3>
+      <div class="modal-btns">
+        <a class="play-link" id="modalPlayLink" href="#" target="_blank">试听</a>
+        <button class="close-btn" onclick="closeModal()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- QRCode 库 -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="config.js"></script>
+  <script>
+    const grid = document.getElementById('qrGrid');
+    const modal = document.getElementById('modal');
+    const modalCanvas = document.getElementById('modalCanvas');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalPlayLink = document.getElementById('modalPlayLink');
+
+    document.getElementById('totalCount').textContent = audioList.length;
+
+    // 获取当前页面的基础URL（去掉 qrcodes.html 部分）
+    const baseUrl = window.location.href.replace(/\/qrcodes\.html.*$/, '/');
+
+    // 生成所有二维码
+    audioList.forEach((item, index) => {
+      const playUrl = baseUrl + 'player.html?id=' + item.id;
+
+      const card = document.createElement('div');
+      card.className = 'qr-card';
+
+      const canvas = document.createElement('canvas');
+      card.appendChild(canvas);
+
+      const titleDiv = document.createElement('div');
+      titleDiv.className = 'qr-title';
+      titleDiv.textContent = item.title;
+      card.appendChild(titleDiv);
+
+      const idDiv = document.createElement('div');
+      idDiv.className = 'qr-id';
+      idDiv.textContent = 'No.' + String(item.id).padStart(2, '0');
+      card.appendChild(idDiv);
+
+      // 生成二维码
+      QRCode.toCanvas(canvas, playUrl, {
+        width: 160,
+        margin: 1,
+        color: { dark: '#1a1a2e', light: '#ffffff' }
+      }, function(err) {
+        if (err) console.error('QR生成失败:', item.id, err);
+      });
+
+      // 点击放大
+      card.addEventListener('click', () => {
+        modalTitle.textContent = item.title;
+        modalPlayLink.href = playUrl;
+        QRCode.toCanvas(modalCanvas, playUrl, {
+          width: 280,
+          margin: 2,
+          color: { dark: '#1a1a2e', light: '#ffffff' }
+        }, function(err) {
+          if (err) console.error(err);
+        });
+        modal.classList.add('show');
+      });
+
+      grid.appendChild(card);
+    });
+
+    function closeModal(e) {
+      if (e && e.target !== modal) return;
+      modal.classList.remove('show');
+    }
+
+    // 批量下载（逐个下载）
+    async function downloadAll() {
+      alert('即将开始下载 ' + audioList.length + ' 个二维码图片，请允许浏览器多次下载。');
+      for (let i = 0; i < audioList.length; i++) {
+        const item = audioList[i];
+        const playUrl = baseUrl + 'player.html?id=' + item.id;
+        try {
+          const dataUrl = await QRCode.toDataURL(playUrl, {
+            width: 400,
+            margin: 2,
+            color: { dark: '#1a1a2e', light: '#ffffff' }
+          });
+          const link = document.createElement('a');
+          link.download = 'QR_' + String(item.id).padStart(2, '0') + '_' + item.title + '.png';
+          link.href = dataUrl;
+          link.click();
+          await new Promise(r => setTimeout(r, 300)); // 间隔300ms避免浏览器拦截
+        } catch (err) {
+          console.error('下载失败:', item.id, err);
+        }
+      }
+    }
+  </script>
+</body>
+</html>
